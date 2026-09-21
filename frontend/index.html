@@ -15,68 +15,78 @@
 
 </head>
 
-
 <body>
 
-    <!-- ============================= -->
-    <!-- HEADER -->
-    <!-- ============================= -->
+    <!-- =====================================================
+         HEADER
+    ====================================================== -->
 
-    <header>
+    <header class="header">
 
-        <div class="logo">
-            SHADOWSCAN
+        <div class="logo-area">
+
+            <div class="logo">
+                SHADOWSCAN
+            </div>
+
+            <div class="subtitle">
+                ADVANCED TCP PORT SCANNER
+            </div>
+
         </div>
 
-        <div class="status">
-            ● SYSTEM ONLINE
+        <div class="system-status">
+
+            <span class="status-dot"></span>
+
+            SYSTEM ONLINE
+
         </div>
 
     </header>
 
 
-    <!-- ============================= -->
-    <!-- MAIN CONTAINER -->
-    <!-- ============================= -->
+    <!-- =====================================================
+         MAIN
+    ====================================================== -->
 
-    <main>
-
-        <section class="scanner-container">
-
-            <h1>
-                NETWORK / PORT SCANNER
-            </h1>
-
-            <p class="subtitle">
-                TCP PORT ENUMERATION ENGINE
-            </p>
+    <main class="container">
 
 
-            <!-- ============================= -->
-            <!-- TARGET INPUT -->
-            <!-- ============================= -->
+        <!-- =================================================
+             SCANNER
+        ================================================== -->
 
-            <div class="input-group">
+        <section class="scanner-card">
 
-                <label for="target">
-                    TARGET HOST
-                </label>
+            <div class="section-title">
 
-                <input
-                    type="text"
-                    id="target"
-                    placeholder="127.0.0.1"
-                    value="127.0.0.1"
-                >
+                <span class="terminal-symbol">
+                    &gt;_
+                </span>
+
+                TARGET CONFIGURATION
 
             </div>
 
 
-            <!-- ============================= -->
-            <!-- PORT INPUTS -->
-            <!-- ============================= -->
+            <div class="input-grid">
 
-            <div class="port-inputs">
+                <div class="input-group">
+
+                    <label for="target">
+                        TARGET HOST
+                    </label>
+
+                    <input
+                        type="text"
+                        id="target"
+                        placeholder="127.0.0.1"
+                        value="127.0.0.1"
+                    >
+
+                </div>
+
 
                 <div class="input-group">
 
@@ -87,9 +97,9 @@
                     <input
                         type="number"
                         id="startPort"
-                        value="1"
                         min="1"
                         max="65535"
+                        value="1"
                     >
 
                 </div>
@@ -104,9 +114,9 @@
                     <input
                         type="number"
                         id="endPort"
-                        value="100"
                         min="1"
                         max="65535"
+                        value="1000"
                     >
 
                 </div>
@@ -114,161 +124,423 @@
             </div>
 
 
-            <!-- ============================= -->
-            <!-- SCAN BUTTON -->
-            <!-- ============================= -->
+            <!-- =================================================
+                 QUICK PRESETS
+            ================================================== -->
 
-            <button id="scanButton">
+            <div class="preset-area">
 
-                ⚡ INITIATE SCAN
-
-            </button>
-
-
-            <!-- ============================= -->
-            <!-- SCAN PRESETS -->
-            <!-- ============================= -->
-
-            <div class="preset-container">
+                <span class="preset-label">
+                    QUICK PRESETS:
+                </span>
 
                 <button
                     class="preset-btn"
                     data-start="1"
-                    data-end="1024"
-                >
+                    data-end="1024">
+
                     COMMON PORTS
+
                 </button>
 
                 <button
                     class="preset-btn"
                     data-start="80"
-                    data-end="443"
-                >
+                    data-end="443">
+
                     WEB PORTS
+
                 </button>
 
                 <button
                     class="preset-btn"
                     data-start="1"
-                    data-end="65535"
-                >
+                    data-end="65535">
+
                     FULL SCAN
+
                 </button>
 
             </div>
 
 
-            <!-- ============================= -->
-            <!-- PROGRESS -->
-            <!-- ============================= -->
+            <!-- =================================================
+                 SCAN CONTROLS
+            ================================================== -->
+
+            <div class="scan-controls">
+
+                <button
+                    id="scanButton"
+                    class="scan-button">
+
+                    ⚡ INITIATE SCAN
+
+                </button>
+
+
+                <button
+                    id="stopButton"
+                    class="stop-button"
+                    style="display: none;">
+
+                    🛑 STOP SCAN
+
+                </button>
+
+            </div>
+
+
+            <!-- =================================================
+                 PROGRESS
+            ================================================== -->
 
             <div class="progress-container">
 
+                <div class="progress-info">
+
+                    <span>
+                        SCAN PROGRESS
+                    </span>
+
+                    <span id="progressText">
+                        0% — WAITING
+                    </span>
+
+                </div>
+
                 <div class="progress-bar">
 
-                    <div id="progressFill"></div>
-
-                </div>
-
-
-                <div id="progressText">
-
-                    0% — READY
-
-                </div>
-
-            </div>
-
-
-            <!-- ============================= -->
-            <!-- STATISTICS -->
-            <!-- ============================= -->
-
-            <div class="stats-container">
-
-
-                <div class="stat-card">
-
-                    <div class="stat-title">
-                        PORTS SCANNED
-                    </div>
-
                     <div
-                        class="stat-value"
-                        id="portsScanned"
-                    >
-                        0
-                    </div>
-
-                </div>
-
-
-                <div class="stat-card">
-
-                    <div class="stat-title">
-                        OPEN PORTS
-                    </div>
-
-                    <div
-                        class="stat-value"
-                        id="openPorts"
-                    >
-                        0
-                    </div>
-
-                </div>
-
-
-                <div class="stat-card">
-
-                    <div class="stat-title">
-                        RISK LEVEL
-                    </div>
-
-                    <div
-                        class="stat-value"
-                        id="riskLevel"
-                    >
-                        —
+                        id="progressFill"
+                        class="progress-fill">
                     </div>
 
                 </div>
 
             </div>
 
-
-            <!-- ============================= -->
-            <!-- SCAN HISTORY -->
-            <!-- ============================= -->
-
-            <div class="history-container">
+        </section>
 
 
-                <div class="history-header">
+        <!-- =================================================
+             STATISTICS
+        ================================================== -->
 
-                    <h3>
-                        SCAN HISTORY
-                    </h3>
+        <section class="stats-grid">
 
 
-                    <button id="clearHistory">
+            <div class="stat-card">
 
-                        CLEAR HISTORY
+                <div class="stat-label">
+                    PORTS SCANNED
+                </div>
 
-                    </button>
+                <div
+                    id="portsScanned"
+                    class="stat-value">
+
+                    0
 
                 </div>
 
+            </div>
 
-                <table id="historyTable">
+
+            <div class="stat-card">
+
+                <div class="stat-label">
+                    OPEN PORTS
+                </div>
+
+                <div
+                    id="openPorts"
+                    class="stat-value">
+
+                    0
+
+                </div>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <div class="stat-label">
+                    CLOSED PORTS
+                </div>
+
+                <div
+                    id="closedPorts"
+                    class="stat-value">
+
+                    0
+
+                </div>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <div class="stat-label">
+                    AVG RISK SCORE
+                </div>
+
+                <div
+                    id="averageRisk"
+                    class="stat-value">
+
+                    0
+
+                </div>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <div class="stat-label">
+                    HIGH RISK
+                </div>
+
+                <div
+                    id="highRisk"
+                    class="stat-value">
+
+                    0
+
+                </div>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <div class="stat-label">
+                    CRITICAL
+                </div>
+
+                <div
+                    id="criticalRisk"
+                    class="stat-value">
+
+                    0
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             OVERALL SECURITY RISK
+        ================================================== -->
+
+        <section class="risk-panel">
+
+            <div class="section-title">
+
+                <span class="terminal-symbol">
+                    &gt;_
+                </span>
+
+                OVERALL SECURITY RISK
+
+            </div>
+
+
+            <div class="overall-risk">
+
+                <div
+                    id="riskLevel"
+                    class="risk-level">
+
+                    —
+
+                </div>
+
+                <div class="risk-description">
+
+                    Risk level is calculated from
+                    detected open ports and their
+                    associated exposure classifications.
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             RISK DISTRIBUTION
+        ================================================== -->
+
+        <section class="risk-distribution">
+
+            <div class="section-title">
+
+                <span class="terminal-symbol">
+                    &gt;_
+                </span>
+
+                RISK DISTRIBUTION
+
+            </div>
+
+
+            <!-- LOW -->
+
+            <div class="risk-row">
+
+                <div class="risk-info">
+
+                    <span>
+                        LOW
+                    </span>
+
+                    <span id="lowRiskCount">
+                        0
+                    </span>
+
+                </div>
+
+                <div class="risk-bar">
+
+                    <div
+                        id="lowRiskBar"
+                        class="risk-bar-fill low">
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- MEDIUM -->
+
+            <div class="risk-row">
+
+                <div class="risk-info">
+
+                    <span>
+                        MEDIUM
+                    </span>
+
+                    <span id="mediumRiskCount">
+                        0
+                    </span>
+
+                </div>
+
+                <div class="risk-bar">
+
+                    <div
+                        id="mediumRiskBar"
+                        class="risk-bar-fill medium">
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- HIGH -->
+
+            <div class="risk-row">
+
+                <div class="risk-info">
+
+                    <span>
+                        HIGH
+                    </span>
+
+                    <span id="highRiskCount">
+                        0
+                    </span>
+
+                </div>
+
+                <div class="risk-bar">
+
+                    <div
+                        id="highRiskBar"
+                        class="risk-bar-fill high">
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- CRITICAL -->
+
+            <div class="risk-row">
+
+                <div class="risk-info">
+
+                    <span>
+                        CRITICAL
+                    </span>
+
+                    <span id="criticalRiskCount">
+                        0
+                    </span>
+
+                </div>
+
+                <div class="risk-bar">
+
+                    <div
+                        id="criticalRiskBar"
+                        class="risk-bar-fill critical">
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             SCAN HISTORY
+        ================================================== -->
+
+        <section class="history-section">
+
+            <div class="section-header">
+
+                <div class="section-title">
+
+                    <span class="terminal-symbol">
+                        &gt;_
+                    </span>
+
+                    SCAN HISTORY
+
+                </div>
+
+                <button
+                    id="clearHistory"
+                    class="clear-history">
+
+                    CLEAR HISTORY
+
+                </button>
+
+            </div>
+
+
+            <div class="table-wrapper">
+
+                <table>
 
                     <thead>
 
                         <tr>
-
-                            <th>
-                                TIME
-                            </th>
 
                             <th>
                                 TARGET
@@ -279,17 +551,28 @@
                             </th>
 
                             <th>
+                                PORTS SCANNED
+                            </th>
+
+                            <th>
                                 OPEN
+                            </th>
+
+                            <th>
+                                AVG SCORE
                             </th>
 
                             <th>
                                 RISK
                             </th>
 
+                            <th>
+                                TIME
+                            </th>
+
                         </tr>
 
                     </thead>
-
 
                     <tbody id="historyBody">
 
@@ -299,19 +582,88 @@
 
             </div>
 
+        </section>
 
-            <!-- ============================= -->
-            <!-- RESULTS TABLE -->
-            <!-- ============================= -->
 
-            <div class="results-container">
+        <!-- =================================================
+             SCAN RESULTS
+        ================================================== -->
 
-                <h3>
+        <section class="results-section">
+
+            <div class="section-header">
+
+                <div class="section-title">
+
+                    <span class="terminal-symbol">
+                        &gt;_
+                    </span>
+
                     SCAN RESULTS
-                </h3>
+
+                </div>
 
 
-                <table id="resultsTable">
+                <button
+                    id="exportReport"
+                    class="export-report"
+                    disabled>
+
+                    📄 EXPORT REPORT
+
+                </button>
+
+            </div>
+
+
+            <!-- =================================================
+                 SEARCH + FILTER
+            ================================================== -->
+
+            <div class="result-filters">
+
+                <input
+                    type="text"
+                    id="resultSearch"
+                    placeholder="🔍 Search port, service, or banner..."
+                    autocomplete="off"
+                >
+
+
+                <select id="riskFilter">
+
+                    <option value="ALL">
+                        ALL RISK LEVELS
+                    </option>
+
+                    <option value="LOW">
+                        LOW
+                    </option>
+
+                    <option value="MEDIUM">
+                        MEDIUM
+                    </option>
+
+                    <option value="HIGH">
+                        HIGH
+                    </option>
+
+                    <option value="CRITICAL">
+                        CRITICAL
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <!-- =================================================
+                 RESULTS TABLE
+            ================================================== -->
+
+            <div class="table-wrapper">
+
+                <table>
 
                     <thead>
 
@@ -319,10 +671,6 @@
 
                             <th>
                                 PORT
-                            </th>
-
-                            <th>
-                                STATUS
                             </th>
 
                             <th>
@@ -334,7 +682,15 @@
                             </th>
 
                             <th>
+                                SCORE
+                            </th>
+
+                            <th>
                                 BANNER
+                            </th>
+
+                            <th>
+                                REASON
                             </th>
 
                         </tr>
@@ -350,84 +706,95 @@
 
             </div>
 
-
-            <!-- ============================= -->
-            <!-- SECURITY FINDINGS -->
-            <!-- ============================= -->
-
-            <section class="findings-section">
-
-                <div class="section-title">
-
-                    <span>⚠</span>
-
-                    SECURITY FINDINGS
-
-                </div>
+        </section>
 
 
-                <div
-                    id="securityFindings"
-                    class="security-findings"
-                >
+        <!-- =================================================
+             SECURITY FINDINGS
+        ================================================== -->
 
-                    <div class="finding-empty">
+        <section class="findings-section">
 
-                        No security findings yet.
-                        Run a scan to analyze the target.
+            <div class="section-title">
 
-                    </div>
+                <span class="terminal-symbol">
+                    &gt;_
+                </span>
 
-                </div>
+                SECURITY FINDINGS
 
-            </section>
-
-
-            <!-- ============================= -->
-            <!-- TERMINAL -->
-            <!-- ============================= -->
-
-            <div class="terminal-container">
-
-                <div class="terminal-header">
-
-                    SHADOWSCAN TERMINAL
-
-                </div>
+            </div>
 
 
-                <div
-                    id="output"
-                    class="terminal-output"
-                >
+            <div
+                id="securityFindings"
+                class="findings-container">
 
-                    > SYSTEM READY_<br>
-                    > WAITING FOR SCAN COMMAND...
+                <div class="finding-empty">
+
+                    No security findings yet.
+                    Run a scan to analyze the target.
 
                 </div>
 
             </div>
 
+        </section>
+
+
+        <!-- =================================================
+             TERMINAL
+        ================================================== -->
+
+        <section class="terminal-section">
+
+            <div class="section-title">
+
+                <span class="terminal-symbol">
+                    &gt;_
+                </span>
+
+                TERMINAL OUTPUT
+
+            </div>
+
+
+            <div
+                id="output"
+                class="terminal-output">
+
+                &gt; SYSTEM READY —
+                WAITING FOR SCAN COMMAND..._
+
+            </div>
 
         </section>
+
 
     </main>
 
 
-    <!-- ============================= -->
-    <!-- FOOTER -->
-    <!-- ============================= -->
+    <!-- =====================================================
+         FOOTER
+    ====================================================== -->
 
-    <footer>
+    <footer class="footer">
 
-        SHADOWSCAN • TCP SECURITY SCANNER
+        <div>
+            SHADOWSCAN // CYBERSECURITY PORT SCANNER
+        </div>
+
+        <div>
+            USE ONLY ON SYSTEMS YOU OWN OR HAVE
+            EXPLICIT PERMISSION TO TEST
+        </div>
 
     </footer>
 
 
-    <!-- ============================= -->
-    <!-- JAVASCRIPT -->
-    <!-- ============================= -->
+    <!-- =====================================================
+         JAVASCRIPT
+    ====================================================== -->
 
     <script src="script.js"></script>
 

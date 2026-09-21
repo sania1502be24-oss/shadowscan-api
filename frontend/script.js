@@ -1,115 +1,369 @@
-// ============================================================
-// SHADOWSCAN - FRONTEND JAVASCRIPT
-// ============================================================
+// ============================================
+// SHADOWSCAN - FRONTEND SCRIPT
+// Version 4.2 - Backend Matched
+// ============================================
+
+const API_BASE = "http://127.0.0.1:8000";
+
+// Largest range one scan may cover (matches the FULL SCAN preset).
+const MAX_PORT_RANGE = 65535;
+
+// ============================================
+// GLOBAL STATE
+// ============================================
+
+let currentScanId = null;
+let currentResults = [];
+let lastScanData = null;
+let scanTimer = null;
+let isScanning = false;
 
 
-// ============================================================
+// ============================================
 // DOM ELEMENTS
-// ============================================================
+// ============================================
 
-const scanButton =
-    document.getElementById("scanButton");
+const targetInput = document.getElementById("target");
+const startPortInput = document.getElementById("startPort");
+const endPortInput = document.getElementById("endPort");
 
-const output =
-    document.getElementById("output");
+const scanButton = document.getElementById("scanButton");
+const stopButton = document.getElementById("stopButton");
 
-const progressFill =
-    document.getElementById("progressFill");
+const progressText = document.getElementById("progressText");
+const progressFill = document.getElementById("progressFill");
 
-const progressText =
-    document.getElementById("progressText");
+const portsScanned = document.getElementById("portsScanned");
+const openPorts = document.getElementById("openPorts");
+const closedPorts = document.getElementById("closedPorts");
+const averageRisk = document.getElementById("averageRisk");
+const highRisk = document.getElementById("highRisk");
+const criticalRisk = document.getElementById("criticalRisk");
 
-const resultsBody =
-    document.getElementById("resultsBody");
+const riskLevel = document.getElementById("riskLevel");
 
-const portsScannedElement =
-    document.getElementById("portsScanned");
+const lowRiskCount = document.getElementById("lowRiskCount");
+const mediumRiskCount = document.getElementById("mediumRiskCount");
+const highRiskCount = document.getElementById("highRiskCount");
+const criticalRiskCount = document.getElementById("criticalRiskCount");
 
-const openPortsElement =
-    document.getElementById("openPorts");
+const lowRiskBar = document.getElementById("lowRiskBar");
+const mediumRiskBar = document.getElementById("mediumRiskBar");
+const highRiskBar = document.getElementById("highRiskBar");
+const criticalRiskBar = document.getElementById("criticalRiskBar");
 
-const riskLevelElement =
-    document.getElementById("riskLevel");
+const clearHistoryButton = document.getElementById("clearHistory");
+const historyBody = document.getElementById("historyBody");
 
-const historyBody =
-    document.getElementById("historyBody");
+const exportReportButton = document.getElementById("exportReport");
 
-const securityFindings =
-    document.getElementById("securityFindings");
+const resultSearch = document.getElementById("resultSearch");
+const riskFilter = document.getElementById("riskFilter");
+const resultsBody = document.getElementById("resultsBody");
 
-const clearHistoryButton =
-    document.getElementById("clearHistory");
+const securityFindings = document.getElementById("securityFindings");
 
-const targetInput =
-    document.getElementById("target");
-
-const startPortInput =
-    document.getElementById("startPort");
-
-const endPortInput =
-    document.getElementById("endPort");
-
-
-// ============================================================
-// BACKEND URL
-// ============================================================
-
-const BACKEND_URL =
-    "http://127.0.0.1:8000";
+const output = document.getElementById("output");
 
 
-// ============================================================
-// RISK SCORE WEIGHTS
-// ============================================================
+// ============================================
+// INITIALIZATION
+// ============================================
 
-const RISK_POINTS = {
+document.addEventListener("DOMContentLoaded", () => {
 
-    21: 15,      // FTP
-    22: 5,       // SSH
-    23: 30,      // Telnet
-    25: 10,      // SMTP
-    53: 5,       // DNS
-    80: 5,       // HTTP
-    110: 10,     // POP3
-    143: 10,     // IMAP
-    443: 0,      // HTTPS
-    3306: 20,    // MySQL
-    5432: 20,    // PostgreSQL
-    6379: 20,    // Redis
-    8000: 5,     // FastAPI
-    8080: 5      // HTTP alternate
-};
+    console.log("================================");
+    console.log("ShadowScan frontend initialized");
+    console.log("================================");
+
+    loadHistory();
+    checkBackend();
+    resetScanUI();
+    setScanningState(false);
+
+    if (scanButton) {
+        scanButton.addEventListener(
+            "click",
+            startScan
+        );
+    }
+
+    if (stopButton) {
+        stopButton.addEventListener(
+            "click",
+            stopScan
+        );
+    }
+
+    document
+        .querySelectorAll(".preset-btn")
+        .forEach(button => {
+
+            button.addEventListener(
+                "click",
+                () => setPreset(
+                    button.dataset.start,
+                    button.dataset.end
+                )
+            );
+        });
+
+    if (resultSearch) {
+        resultSearch.addEventListener(
+            "input",
+            renderResults
+        );
+    }
+
+    if (riskFilter) {
+        riskFilter.addEventListener(
+            "change",
+            renderResults
+        );
+    }
+
+    if (clearHistoryButton) {
+        clearHistoryButton.addEventListener(
+            "click",
+            clearHistory
+        );
+    }
+
+    if (exportReportButton) {
+        exportReportButton.addEventListener(
+            "click",
+            exportReport
+        );
+    }
+});
 
 
-// ============================================================
-// SCAN BUTTON
-// ============================================================
+// ============================================
+// CHECK BACKEND
+// ============================================
 
-scanButton.addEventListener(
-    "click",
-    startScan
-);
+async function checkBackend() {
+
+    try {
+
+        const response = await fetch(
+            `${API_BASE}/`
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                `Backend returned ${response.status}`
+            );
+        }
+
+        const data =
+            await response.json();
+
+        console.log(
+            "Backend connected:",
+            data
+        );
+
+        addTerminalMessage(
+            "Backend connection established.",
+            "success"
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Backend connection failed:",
+            error
+        );
+
+        addTerminalMessage(
+            "BACKEND CONNECTION FAILED",
+            "error"
+        );
+    }
+}
 
 
-// ============================================================
+// ============================================
+// RESET UI
+// ============================================
+
+function resetScanUI() {
+
+    currentScanId = null;
+    currentResults = [];
+    lastScanData = null;
+
+    if (progressText) {
+        progressText.textContent = "0% — WAITING";
+    }
+
+    if (progressFill) {
+        progressFill.style.width = "0%";
+    }
+
+    if (portsScanned) {
+        portsScanned.textContent = "0";
+    }
+
+    if (openPorts) {
+        openPorts.textContent = "0";
+    }
+
+    if (closedPorts) {
+        closedPorts.textContent = "0";
+    }
+
+    if (averageRisk) {
+        averageRisk.textContent = "0";
+    }
+
+    if (highRisk) {
+        highRisk.textContent = "0";
+    }
+
+    if (criticalRisk) {
+        criticalRisk.textContent = "0";
+    }
+
+    if (riskLevel) {
+        riskLevel.textContent = "—";
+    }
+
+    resetRiskDistribution();
+
+    if (resultsBody) {
+
+        resultsBody.innerHTML = `
+            <tr>
+                <td colspan="6">
+                    No scan results yet.
+                </td>
+            </tr>
+        `;
+    }
+
+    if (securityFindings) {
+
+        securityFindings.innerHTML = `
+            <div class="finding-empty">
+                No security findings yet.
+            </div>
+        `;
+    }
+
+    if (exportReportButton) {
+        exportReportButton.disabled = true;
+    }
+}
+
+
+// ============================================
+// RESET RISK DISTRIBUTION
+// ============================================
+
+function resetRiskDistribution() {
+
+    if (lowRiskCount) {
+        lowRiskCount.textContent = "0";
+    }
+
+    if (mediumRiskCount) {
+        mediumRiskCount.textContent = "0";
+    }
+
+    if (highRiskCount) {
+        highRiskCount.textContent = "0";
+    }
+
+    if (criticalRiskCount) {
+        criticalRiskCount.textContent = "0";
+    }
+
+    if (lowRiskBar) {
+        lowRiskBar.style.width = "0%";
+    }
+
+    if (mediumRiskBar) {
+        mediumRiskBar.style.width = "0%";
+    }
+
+    if (highRiskBar) {
+        highRiskBar.style.width = "0%";
+    }
+
+    if (criticalRiskBar) {
+        criticalRiskBar.style.width = "0%";
+    }
+}
+
+
+// ============================================
+// SCANNING STATE
+// ============================================
+
+function setScanningState(scanning) {
+
+    isScanning = scanning;
+
+    if (scanButton) {
+        scanButton.disabled = scanning;
+    }
+
+    if (stopButton) {
+        stopButton.disabled = !scanning;
+        stopButton.style.display = scanning ? "" : "none";
+    }
+
+    document
+        .querySelectorAll(".preset-btn")
+        .forEach(button => {
+            button.disabled = scanning;
+        });
+
+    if (targetInput) {
+        targetInput.disabled = scanning;
+    }
+
+    if (startPortInput) {
+        startPortInput.disabled = scanning;
+    }
+
+    if (endPortInput) {
+        endPortInput.disabled = scanning;
+    }
+}
+
+
+// ============================================
 // START SCAN
-// ============================================================
+// ============================================
 
 async function startScan() {
 
+    if (isScanning) {
+        return;
+    }
+
     const target =
-        targetInput.value.trim();
+        targetInput?.value.trim();
 
     const startPort =
-        parseInt(startPortInput.value);
+        parseInt(
+            startPortInput?.value,
+            10
+        );
 
     const endPort =
-        parseInt(endPortInput.value);
+        parseInt(
+            endPortInput?.value,
+            10
+        );
 
 
-    // ========================================================
+    // ----------------------------------------
     // VALIDATION
-    // ========================================================
+    // ----------------------------------------
 
     if (!target) {
 
@@ -120,10 +374,9 @@ async function startScan() {
         return;
     }
 
-
     if (
-        isNaN(startPort) ||
-        isNaN(endPort)
+        Number.isNaN(startPort) ||
+        Number.isNaN(endPort)
     ) {
 
         alert(
@@ -133,139 +386,71 @@ async function startScan() {
         return;
     }
 
-
     if (
         startPort < 1 ||
-        endPort > 65535
-    ) {
-
-        alert(
-            "Port numbers must be between 1 and 65535."
-        );
-
-        return;
-    }
-
-
-    if (
+        endPort > 65535 ||
         startPort > endPort
     ) {
 
         alert(
-            "Start port cannot be greater than end port."
+            "Port range must be between 1 and 65535."
+        );
+
+        return;
+    }
+
+    if (
+        endPort - startPort + 1 > MAX_PORT_RANGE
+    ) {
+
+        alert(
+            `Maximum scan range is ${MAX_PORT_RANGE} ports.`
         );
 
         return;
     }
 
 
-    // ========================================================
-    // RESET UI
-    // ========================================================
+    // ----------------------------------------
+    // PREPARE UI
+    // ----------------------------------------
 
-    scanButton.disabled =
-        true;
+    clearScanTimer();
 
-    scanButton.innerText =
-        "⚡ SCANNING...";
+    resetScanUI();
 
+    setScanningState(true);
 
-    progressFill.style.width =
-        "0%";
+    addTerminalMessage(
+        `Starting scan: ${target}:${startPort}-${endPort}`,
+        "info"
+    );
 
-    progressText.innerText =
-        "0% — INITIALIZING";
-
-
-    resultsBody.innerHTML =
-        "";
-
-
-    portsScannedElement.innerText =
-        "0";
-
-    openPortsElement.innerText =
-        "0";
-
-    riskLevelElement.innerText =
-        "—";
-
-
-    // ========================================================
-    // RESET SECURITY FINDINGS
-    // ========================================================
-
-    if (securityFindings) {
-
-        securityFindings.innerHTML = `
-            <div class="finding-empty">
-                Analyzing detected services...
-            </div>
-        `;
-    }
-
-
-    // ========================================================
-    // TERMINAL
-    // ========================================================
-
-    output.innerHTML = `
-        > INITIALIZING SHADOWSCAN...<br>
-        > TARGET: ${target}<br>
-        > PORT RANGE: ${startPort} - ${endPort}<br>
-        > CONNECTING TO SCANNER ENGINE...
-    `;
-
-
-    // ========================================================
-    // PROGRESS ANIMATION
-    // ========================================================
-
-    let progress =
-        0;
-
-
-    const progressInterval =
-        setInterval(
-            () => {
-
-                if (progress < 90) {
-
-                    progress += 5;
-
-                    progressFill.style.width =
-                        `${progress}%`;
-
-                    progressText.innerText =
-                        `${progress}% — SCANNING`;
-                }
-
-            },
-            150
-        );
-
-
-    // ========================================================
-    // API REQUEST
-    // ========================================================
 
     try {
 
-        const url =
-            `${BACKEND_URL}/scan` +
-            `?target=${encodeURIComponent(target)}` +
-            `&start_port=${startPort}` +
-            `&end_port=${endPort}`;
-
+        // ------------------------------------
+        // START BACKEND SCAN
+        // ------------------------------------
 
         const response =
-            await fetch(url);
+            await fetch(
+                `${API_BASE}/scan?target=${encodeURIComponent(
+                    target
+                )}&start_port=${startPort}&end_port=${endPort}`,
+                {
+                    method: "POST"
+                }
+            );
 
 
         if (!response.ok) {
 
+            const errorText =
+                await response.text();
+
             throw new Error(
-                `Server returned ${response.status}`
+                `Scan start failed (${response.status}): ${errorText}`
             );
         }
 
@@ -273,26 +458,11 @@ async function startScan() {
         const data =
             await response.json();
 
-
-        // ====================================================
-        // STOP PROGRESS
-        // ====================================================
-
-        clearInterval(
-            progressInterval
+        console.log(
+            "SCAN START RESPONSE:",
+            data
         );
 
-
-        progressFill.style.width =
-            "100%";
-
-        progressText.innerText =
-            "100% — SCAN COMPLETE";
-
-
-        // ====================================================
-        // BACKEND ERROR
-        // ====================================================
 
         if (data.error) {
 
@@ -302,1054 +472,2062 @@ async function startScan() {
         }
 
 
-        // ====================================================
-        // UPDATE STATISTICS
-        // ====================================================
-
-        portsScannedElement.innerText =
-            data.ports_scanned;
-
-        openPortsElement.innerText =
-            data.open_ports_count;
+        currentScanId =
+            data.scan_id;
 
 
-        // ====================================================
-        // CALCULATE RISK SCORE
-        // ====================================================
+        if (!currentScanId) {
 
-        const riskData =
-            calculateRiskScore(
-                data.open_ports
+            throw new Error(
+                "Backend did not return a scan_id."
             );
-
-
-        riskLevelElement.innerText =
-            riskData.level;
-
-
-        // ====================================================
-        // DISPLAY RESULTS
-        // ====================================================
-
-        displayResults(
-            data.open_ports
-        );
-
-
-        // ====================================================
-        // DISPLAY SECURITY FINDINGS
-        // ========================================================
-
-        if (
-            !data.open_ports ||
-            data.open_ports.length === 0
-        ) {
-
-            if (securityFindings) {
-
-                securityFindings.innerHTML = `
-                    <div class="finding-empty">
-                        No security findings detected.
-                    </div>
-                `;
-            }
-
-        } else {
-
-            for (
-                const portInfo
-                of data.open_ports
-            ) {
-
-                const port =
-                    portInfo.port;
-
-                const service =
-                    portInfo.service ||
-                    "Unknown";
-
-
-                addSecurityFinding(
-                    port,
-                    service
-                );
-            }
         }
 
 
-        // ====================================================
-        // TERMINAL SUCCESS
-        // ====================================================
-
-        output.innerHTML += `
-            <br>
-            > SCAN COMPLETED SUCCESSFULLY_<br>
-            > PORTS SCANNED: ${data.ports_scanned}<br>
-            > OPEN PORTS: ${data.open_ports_count}<br>
-            > CLOSED PORTS: ${data.closed_ports}<br>
-            > SECURITY SCORE: ${riskData.score}/100<br>
-            > RISK LEVEL: ${riskData.level}
-        `;
+        addTerminalMessage(
+            `Scan started. ID: ${currentScanId}`,
+            "success"
+        );
 
 
-        // ====================================================
-        // SAVE HISTORY
-        // ====================================================
+        // ------------------------------------
+        // START POLLING
+        // ------------------------------------
 
-        saveScanHistory({
-
-            time:
-                new Date().toLocaleString(),
-
-            target:
-                target,
-
-            range:
-                `${startPort}-${endPort}`,
-
-            open:
-                data.open_ports_count,
-
-            risk:
-                riskData.level,
-
-            score:
-                riskData.score
-        });
-
-
-        displayHistory();
+        pollScanStatus();
 
 
     } catch (error) {
 
-        // ====================================================
-        // STOP PROGRESS
-        // ====================================================
-
-        clearInterval(
-            progressInterval
-        );
-
-
-        progressFill.style.width =
-            "100%";
-
-        progressText.innerText =
-            "SCAN FAILED";
-
-
-        // ====================================================
-        // ERROR MESSAGE
-        // ====================================================
-
-        output.innerHTML += `
-            <br>
-            > ERROR: ${error.message}<br>
-            > CHECK BACKEND CONNECTION.
-        `;
-
-
         console.error(
-            "ShadowScan Error:",
+            "START SCAN ERROR:",
             error
         );
 
-
-        alert(
-            "Scan failed. Make sure the ShadowScan backend is running."
+        addTerminalMessage(
+            `SCAN ERROR: ${error.message}`,
+            "error"
         );
 
-
-    } finally {
-
-        // ====================================================
-        // RESTORE BUTTON
-        // ====================================================
-
-        scanButton.disabled =
-            false;
-
-        scanButton.innerText =
-            "⚡ INITIATE SCAN";
+        setScanningState(false);
     }
 }
 
 
-// ============================================================
-// DISPLAY RESULTS
-// ============================================================
+// ============================================
+// POLL STATUS
+// ============================================
 
-function displayResults(
-    openPorts
-) {
+async function pollScanStatus() {
 
-    resultsBody.innerHTML =
-        "";
-
-
-    if (
-        !openPorts ||
-        openPorts.length === 0
-    ) {
-
-        const row =
-            document.createElement(
-                "tr"
-            );
-
-
-        row.innerHTML = `
-            <td colspan="4">
-                No open ports detected.
-            </td>
-        `;
-
-
-        resultsBody.appendChild(
-            row
-        );
-
+    if (!currentScanId) {
         return;
     }
 
 
-    for (
-        const portInfo
-        of openPorts
-    ) {
+    try {
 
-        const port =
-            portInfo.port;
-
-        const service =
-            portInfo.service ||
-            "Unknown";
-
-
-        const risk =
-            getPortRisk(
-                port
+        const response =
+            await fetch(
+                `${API_BASE}/scan/${currentScanId}/status`
             );
 
 
-        const row =
-            document.createElement(
-                "tr"
+        if (!response.ok) {
+
+            throw new Error(
+                `Status request failed: ${response.status}`
+            );
+        }
+
+
+        const data =
+            await response.json();
+
+
+        console.log(
+            "SCAN STATUS:",
+            data
+        );
+
+
+        updateProgress(data);
+
+
+        // ------------------------------------
+        // COMPLETED
+        // ------------------------------------
+
+        if (
+            data.status === "completed"
+        ) {
+
+            clearScanTimer();
+
+            updateProgress({
+                ...data,
+                progress: 100
+            });
+
+
+            addTerminalMessage(
+                "SCAN COMPLETED",
+                "success"
             );
 
 
-        row.innerHTML = `
-            <td>
-                ${port}
-            </td>
-
-            <td>
-                <span class="status-open">
-                    OPEN
-                </span>
-            </td>
-
-            <td>
-                ${service}
-            </td>
-
-            <td>
-                <span class="${getRiskClass(risk)}">
-                    ${risk}
-                </span>
-            </td>
-        `;
+            await loadScanResults();
 
 
-        resultsBody.appendChild(
-            row
+            setScanningState(false);
+
+            return;
+        }
+
+
+        // ------------------------------------
+        // CANCELLED
+        // ------------------------------------
+
+        if (
+            data.status === "cancelled"
+        ) {
+
+            clearScanTimer();
+
+            addTerminalMessage(
+                "SCAN CANCELLED",
+                "warning"
+            );
+
+            setScanningState(false);
+
+            return;
+        }
+
+
+        // ------------------------------------
+        // ERROR
+        // ------------------------------------
+
+        if (
+            data.status === "failed" ||
+            data.status === "error"
+        ) {
+
+            clearScanTimer();
+
+            addTerminalMessage(
+                data.error
+                    ? `SCAN FAILED: ${data.error}`
+                    : "SCAN FAILED",
+                "error"
+            );
+
+            setScanningState(false);
+
+            return;
+        }
+
+
+        // ------------------------------------
+        // CONTINUE
+        // ------------------------------------
+
+        scanTimer =
+            setTimeout(
+                pollScanStatus,
+                500
+            );
+
+
+    } catch (error) {
+
+        console.error(
+            "POLL ERROR:",
+            error
+        );
+
+        clearScanTimer();
+
+        addTerminalMessage(
+            `STATUS ERROR: ${error.message}`,
+            "error"
+        );
+
+        setScanningState(false);
+    }
+}
+
+
+// ============================================
+// UPDATE PROGRESS
+// ============================================
+
+function updateProgress(data) {
+
+    const progress =
+        Number(
+            data.progress || 0
+        );
+
+
+    const totalPorts =
+        Number(
+            data.total_ports ||
+            (
+                Number(data.end_port || 0) -
+                Number(data.start_port || 0) +
+                1
+            )
+        );
+
+
+    const scanned =
+        Number(
+            data.ports_scanned ??
+            Math.round(
+                totalPorts *
+                progress /
+                100
+            )
+        );
+
+
+    if (progressText) {
+
+        const labels = {
+            starting: "STARTING",
+            scanning: "SCANNING",
+            cancelling: "CANCELLING",
+            cancelled: "CANCELLED",
+            completed: "COMPLETE",
+            failed: "FAILED"
+        };
+
+        const label =
+            labels[data.status];
+
+        progressText.textContent =
+            label
+                ? `${progress}% — ${label}`
+                : `${progress}%`;
+    }
+
+
+    if (progressFill) {
+
+        progressFill.style.width =
+            `${progress}%`;
+    }
+
+
+    if (portsScanned) {
+
+        portsScanned.textContent =
+            scanned;
+    }
+
+
+    // The status endpoint sends the running open-port count as
+    // "open_ports"; the final result uses "open_ports_count".
+
+    const liveOpen =
+        data.open_ports_count ??
+        (
+            typeof data.open_ports === "number"
+                ? data.open_ports
+                : undefined
+        );
+
+
+    if (liveOpen !== undefined) {
+
+        if (openPorts) {
+
+            openPorts.textContent =
+                liveOpen;
+        }
+    }
+
+
+    const liveClosed =
+        data.closed_ports ??
+        (
+            liveOpen !== undefined
+                ? Math.max(scanned - liveOpen, 0)
+                : undefined
+        );
+
+
+    if (liveClosed !== undefined) {
+
+        if (closedPorts) {
+
+            closedPorts.textContent =
+                liveClosed;
+        }
+    }
+}
+
+
+// ============================================
+// LOAD FINAL RESULT
+// ============================================
+
+async function loadScanResults() {
+
+    if (!currentScanId) {
+        return;
+    }
+
+
+    try {
+
+        /*
+         * IMPORTANT:
+         *
+         * Actual backend endpoint:
+         *
+         * GET /scan/{scan_id}/result
+         *
+         * NOT /results
+         */
+
+        const response =
+            await fetch(
+                `${API_BASE}/scan/${currentScanId}/result`
+            );
+
+
+        if (!response.ok) {
+
+            const errorText =
+                await response.text();
+
+            throw new Error(
+                `Result request failed (${response.status}): ${errorText}`
+            );
+        }
+
+
+        const data =
+            await response.json();
+
+
+        console.log(
+            "===================================="
+        );
+
+        console.log(
+            "FINAL SHADOWSCAN RESULT"
+        );
+
+        console.log(
+            data
+        );
+
+        console.log(
+            "===================================="
+        );
+
+
+        // ------------------------------------
+        // SAVE COMPLETE RESULT
+        // ------------------------------------
+
+        lastScanData =
+            data;
+
+
+        /*
+         * ACTUAL BACKEND FIELD:
+         *
+         * open_ports
+         *
+         * There is NO data.results.
+         */
+
+        currentResults =
+            Array.isArray(
+                data.open_ports
+            )
+                ? data.open_ports
+                : [];
+
+
+        console.log(
+            "OPEN PORT RESULTS:",
+            currentResults
+        );
+
+
+        // ------------------------------------
+        // UPDATE UI
+        // ------------------------------------
+
+        updateStats(data);
+
+        renderResults();
+
+        updateSecurityFindings(data);
+
+        saveScanToHistory(data);
+
+
+        // ------------------------------------
+        // ENABLE EXPORT
+        // ------------------------------------
+
+        if (exportReportButton) {
+
+            exportReportButton.disabled =
+                false;
+        }
+
+
+        addTerminalMessage(
+            "Scan results loaded successfully.",
+            "success"
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "LOAD RESULTS ERROR:",
+            error
+        );
+
+        addTerminalMessage(
+            `RESULT ERROR: ${error.message}`,
+            "error"
         );
     }
 }
 
 
-// ============================================================
-// PORT RISK
-// ============================================================
+// ============================================
+// UPDATE STATISTICS
+// ============================================
 
-function getPortRisk(
-    port
+function updateStats(data) {
+
+    // ----------------------------------------
+    // ACTUAL BACKEND FIELDS
+    // ----------------------------------------
+
+    const scanned =
+        Number(
+            data.ports_scanned || 0
+        );
+
+
+    const opened =
+        Number(
+            data.open_ports_count || 0
+        );
+
+
+    const closed =
+        Number(
+            data.closed_ports || 0
+        );
+
+
+    const avg =
+        Number(
+            data.average_risk_score || 0
+        );
+
+
+    const overallRisk =
+        String(
+            data.overall_risk ||
+            calculateOverallRisk(avg)
+        ).toUpperCase();
+
+
+    // ----------------------------------------
+    // BASIC STATS
+    // ----------------------------------------
+
+    if (portsScanned) {
+
+        portsScanned.textContent =
+            scanned;
+    }
+
+
+    if (openPorts) {
+
+        openPorts.textContent =
+            opened;
+    }
+
+
+    if (closedPorts) {
+
+        closedPorts.textContent =
+            closed;
+    }
+
+
+    if (averageRisk) {
+
+        averageRisk.textContent =
+            avg.toFixed(0);
+    }
+
+
+    // ----------------------------------------
+    // HIGH / CRITICAL
+    // ----------------------------------------
+
+    const high =
+        countRisk(
+            "HIGH"
+        );
+
+
+    const critical =
+        countRisk(
+            "CRITICAL"
+        );
+
+
+    if (highRisk) {
+
+        highRisk.textContent =
+            high;
+    }
+
+
+    if (criticalRisk) {
+
+        criticalRisk.textContent =
+            critical;
+    }
+
+
+    // ----------------------------------------
+    // OVERALL RISK
+    // ----------------------------------------
+
+    if (riskLevel) {
+
+        riskLevel.textContent =
+            overallRisk || "—";
+    }
+
+
+    // ----------------------------------------
+    // RISK DISTRIBUTION
+    // ----------------------------------------
+
+    updateRiskDistribution(
+        data
+    );
+}
+
+
+// ============================================
+// OVERALL RISK CALCULATION
+// ============================================
+
+function calculateOverallRisk(
+    score
 ) {
 
-    if (
-        port === 23
-    ) {
+    score =
+        Number(score || 0);
 
+
+    if (score >= 80) {
+        return "CRITICAL";
+    }
+
+
+    if (score >= 60) {
         return "HIGH";
     }
 
 
-    if (
-        port === 21 ||
-        port === 25 ||
-        port === 110 ||
-        port === 143 ||
-        port === 3306 ||
-        port === 5432 ||
-        port === 6379
-    ) {
-
+    if (score >= 30) {
         return "MEDIUM";
     }
 
 
-    if (
-        port === 22 ||
-        port === 80 ||
-        port === 8080
-    ) {
-
-        return "LOW";
-    }
-
-
-    return "INFO";
+    return "LOW";
 }
 
 
-// ============================================================
-// RISK CSS CLASS
-// ============================================================
+// ============================================
+// RISK DISTRIBUTION
+// ============================================
 
-function getRiskClass(
-    risk
+function updateRiskDistribution(
+    data
 ) {
 
-    if (
-        risk === "HIGH"
-    ) {
+    const counts = {
 
-        return "risk-high";
-    }
+        LOW: 0,
 
+        MEDIUM: 0,
 
-    if (
-        risk === "MEDIUM"
-    ) {
+        HIGH: 0,
 
-        return "risk-medium";
-    }
-
-
-    if (
-        risk === "LOW"
-    ) {
-
-        return "risk-low";
-    }
-
-
-    return "";
-}
-
-
-// ============================================================
-// RISK SCORE 2.0
-// ============================================================
-
-function calculateRiskScore(
-    openPorts
-) {
-
-    if (
-        !openPorts ||
-        openPorts.length === 0
-    ) {
-
-        return {
-            score: 0,
-            level: "LOW"
-        };
-    }
-
-
-    let score =
-        0;
-
-
-    // ========================================================
-    // ADD POINTS FOR EACH OPEN SERVICE
-    // ========================================================
-
-    for (
-        const portInfo
-        of openPorts
-    ) {
-
-        const port =
-            portInfo.port;
-
-
-        const points =
-            RISK_POINTS[port] || 3;
-
-
-        score += points;
-    }
-
-
-    // ========================================================
-    // CAP SCORE
-    // ========================================================
-
-    if (
-        score > 100
-    ) {
-
-        score = 100;
-    }
-
-
-    // ========================================================
-    // DETERMINE RISK LEVEL
-    // ========================================================
-
-    let level =
-        "LOW";
-
-
-    if (
-        score >= 60
-    ) {
-
-        level =
-            "HIGH";
-
-    } else if (
-        score >= 30
-    ) {
-
-        level =
-            "MEDIUM";
-
-    } else {
-
-        level =
-            "LOW";
-    }
-
-
-    return {
-        score: score,
-        level: level
+        CRITICAL: 0
     };
-}
 
 
-// ============================================================
-// SECURITY FINDINGS
-// ============================================================
+    // ----------------------------------------
+    // ACTUAL BACKEND risk_counts
+    // ----------------------------------------
 
-function addSecurityFinding(
-    port,
-    service
-) {
+    if (
+        data.risk_counts &&
+        typeof data.risk_counts === "object"
+    ) {
 
-    if (!securityFindings) {
+        counts.LOW =
+            Number(
+                data.risk_counts.LOW || 0
+            );
+
+
+        counts.MEDIUM =
+            Number(
+                data.risk_counts.MEDIUM || 0
+            );
+
+
+        counts.HIGH =
+            Number(
+                data.risk_counts.HIGH || 0
+            );
+
+
+        counts.CRITICAL =
+            Number(
+                data.risk_counts.CRITICAL || 0
+            );
+    }
+
+
+    // ----------------------------------------
+    // UPDATE NUMBERS
+    // ----------------------------------------
+
+    if (lowRiskCount) {
+
+        lowRiskCount.textContent =
+            counts.LOW;
+    }
+
+
+    if (mediumRiskCount) {
+
+        mediumRiskCount.textContent =
+            counts.MEDIUM;
+    }
+
+
+    if (highRiskCount) {
+
+        highRiskCount.textContent =
+            counts.HIGH;
+    }
+
+
+    if (criticalRiskCount) {
+
+        criticalRiskCount.textContent =
+            counts.CRITICAL;
+    }
+
+
+    // ----------------------------------------
+    // TOTAL
+    // ----------------------------------------
+
+    const total =
+        counts.LOW +
+        counts.MEDIUM +
+        counts.HIGH +
+        counts.CRITICAL;
+
+
+    if (total === 0) {
+
+        if (lowRiskBar) {
+            lowRiskBar.style.width = "0%";
+        }
+
+        if (mediumRiskBar) {
+            mediumRiskBar.style.width = "0%";
+        }
+
+        if (highRiskBar) {
+            highRiskBar.style.width = "0%";
+        }
+
+        if (criticalRiskBar) {
+            criticalRiskBar.style.width = "0%";
+        }
 
         return;
     }
 
 
-    // --------------------------------------------------------
-    // REMOVE EMPTY MESSAGE
-    // --------------------------------------------------------
+    // ----------------------------------------
+    // UPDATE BARS
+    // ----------------------------------------
 
-    const emptyMessage =
-        securityFindings.querySelector(
-            ".finding-empty"
+    if (lowRiskBar) {
+
+        lowRiskBar.style.width =
+            `${(
+                counts.LOW /
+                total
+            ) * 100}%`;
+    }
+
+
+    if (mediumRiskBar) {
+
+        mediumRiskBar.style.width =
+            `${(
+                counts.MEDIUM /
+                total
+            ) * 100}%`;
+    }
+
+
+    if (highRiskBar) {
+
+        highRiskBar.style.width =
+            `${(
+                counts.HIGH /
+                total
+            ) * 100}%`;
+    }
+
+
+    if (criticalRiskBar) {
+
+        criticalRiskBar.style.width =
+            `${(
+                counts.CRITICAL /
+                total
+            ) * 100}%`;
+    }
+}
+
+
+// ============================================
+// COUNT RISK
+// ============================================
+
+function countRisk(
+    level
+) {
+
+    const wanted =
+        String(
+            level
+        ).toUpperCase();
+
+
+    return currentResults.filter(
+        result =>
+            String(
+                result.risk || ""
+            ).toUpperCase() === wanted
+    ).length;
+}
+
+
+// ============================================
+// RENDER RESULTS
+// ============================================
+
+function renderResults() {
+
+    if (!resultsBody) {
+        return;
+    }
+
+
+    const search =
+        resultSearch?.value
+            ?.trim()
+            .toLowerCase() || "";
+
+
+    const selectedRisk =
+        riskFilter?.value
+            ?.trim()
+            .toUpperCase() || "ALL";
+
+
+    let filtered =
+        [...currentResults];
+
+
+    // ----------------------------------------
+    // SEARCH
+    // ----------------------------------------
+
+    if (search) {
+
+        filtered =
+            filtered.filter(
+                result => {
+
+                    const searchableText = [
+
+                        result.port,
+
+                        result.service,
+
+                        result.banner,
+
+                        result.risk,
+
+                        result.risk_reason,
+
+                        result.finding,
+
+                        result.recommendation
+
+                    ]
+                        .join(" ")
+                        .toLowerCase();
+
+
+                    return searchableText
+                        .includes(search);
+                }
+            );
+    }
+
+
+    // ----------------------------------------
+    // RISK FILTER
+    // ----------------------------------------
+
+    if (
+        selectedRisk &&
+        selectedRisk !== "ALL"
+    ) {
+
+        filtered =
+            filtered.filter(
+                result =>
+                    String(
+                        result.risk || ""
+                    ).toUpperCase() ===
+                    selectedRisk
+            );
+    }
+
+
+    // ----------------------------------------
+    // EMPTY
+    // ----------------------------------------
+
+    if (
+        filtered.length === 0
+    ) {
+
+        resultsBody.innerHTML = `
+            <tr>
+                <td colspan="6">
+                    No open ports found.
+                </td>
+            </tr>
+        `;
+
+        return;
+    }
+
+
+    // ----------------------------------------
+    // TABLE
+    // ----------------------------------------
+
+    resultsBody.innerHTML =
+        filtered.map(
+            result => {
+
+                const risk =
+                    String(
+                        result.risk ||
+                        "UNKNOWN"
+                    ).toUpperCase();
+
+
+                const riskClass =
+                    risk.toLowerCase();
+
+
+                const port =
+                    escapeHTML(
+                        result.port ??
+                        "—"
+                    );
+
+
+                const service =
+                    escapeHTML(
+                        result.service ||
+                        "Unknown"
+                    );
+
+
+                const banner =
+                    escapeHTML(
+                        result.banner ||
+                        "—"
+                    );
+
+
+                const score =
+                    result.risk_score ??
+                    "—";
+
+
+                const reason =
+                    escapeHTML(
+                        result.risk_reason ||
+                        "—"
+                    );
+
+
+                return `
+                    <tr>
+
+                        <td>
+                            ${port}
+                        </td>
+
+                        <td>
+                            ${service}
+                        </td>
+
+                        <td>
+                            <span
+                                class="risk-badge ${riskClass}"
+                            >
+                                ${risk}
+                            </span>
+                        </td>
+
+                        <td>
+                            ${score}
+                        </td>
+
+                        <td>
+                            ${banner}
+                        </td>
+
+                        <td>
+                            ${reason}
+                        </td>
+
+                    </tr>
+                `;
+            }
+        ).join("");
+}
+
+
+// ============================================
+// SECURITY FINDINGS
+// ============================================
+
+function updateSecurityFindings(
+    data
+) {
+
+    if (!securityFindings) {
+        return;
+    }
+
+
+    const findings =
+        Array.isArray(
+            data.security_findings
+        )
+            ? data.security_findings
+            : [];
+
+
+    if (
+        findings.length === 0
+    ) {
+
+        securityFindings.innerHTML = `
+            <div class="finding-empty">
+                No security findings detected.
+            </div>
+        `;
+
+        return;
+    }
+
+
+    securityFindings.innerHTML =
+        findings.map(
+            finding => {
+
+                const severity =
+                    String(
+                        finding.severity ||
+                        "LOW"
+                    ).toUpperCase();
+
+
+                const severityClass =
+                    severity.toLowerCase();
+
+
+                const title =
+                    escapeHTML(
+                        finding.title ||
+                        "Security Finding"
+                    );
+
+
+                const port =
+                    escapeHTML(
+                        finding.port ??
+                        "—"
+                    );
+
+
+                const service =
+                    escapeHTML(
+                        finding.service ||
+                        "Unknown"
+                    );
+
+
+                const score =
+                    finding.risk_score ??
+                    "—";
+
+
+                const description =
+                    escapeHTML(
+                        finding.description ||
+                        "No description available."
+                    );
+
+
+                const recommendation =
+                    escapeHTML(
+                        finding.recommendation ||
+                        "Review this service."
+                    );
+
+
+                return `
+                    <div
+                        class="finding"
+                        data-severity="${severity}"
+                    >
+
+                        <strong>
+                            ${title}
+                        </strong>
+
+                        <div>
+
+                            <b>Port:</b>
+                            ${port}
+
+                            &nbsp;&nbsp;
+
+                            <b>Service:</b>
+                            ${service}
+
+                            &nbsp;&nbsp;
+
+                            <b>Risk Score:</b>
+                            ${score}
+
+                        </div>
+
+                        <span
+                            class="finding-severity ${severityClass}"
+                        >
+                            ${severity}
+                        </span>
+
+                        <p>
+
+                            <b>Description:</b>
+
+                            ${description}
+
+                        </p>
+
+                        <div
+                            class="finding-recommendation"
+                        >
+
+                            <strong>
+                                Recommendation:
+                            </strong>
+
+                            ${recommendation}
+
+                        </div>
+
+                    </div>
+                `;
+            }
+        ).join("");
+}
+
+
+// ============================================
+// STOP SCAN
+// ============================================
+
+async function stopScan() {
+
+    if (!currentScanId) {
+        return;
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${API_BASE}/scan/${currentScanId}/cancel`,
+                {
+                    method: "POST"
+                }
+            );
+
+
+        if (!response.ok) {
+
+            const errorText =
+                await response.text();
+
+            throw new Error(
+                `Cancel failed (${response.status}): ${errorText}`
+            );
+        }
+
+
+        const data =
+            await response.json();
+
+
+        console.log(
+            "CANCEL RESPONSE:",
+            data
         );
 
 
-    if (emptyMessage) {
+        addTerminalMessage(
+            "Cancellation requested...",
+            "warning"
+        );
 
-        emptyMessage.remove();
+
+    } catch (error) {
+
+        console.error(
+            "STOP SCAN ERROR:",
+            error
+        );
+
+
+        addTerminalMessage(
+            `STOP ERROR: ${error.message}`,
+            "error"
+        );
+    }
+}
+
+
+// ============================================
+// CLEAR TIMER
+// ============================================
+
+function clearScanTimer() {
+
+    if (scanTimer) {
+
+        clearTimeout(
+            scanTimer
+        );
+
+        scanTimer = null;
+    }
+}
+
+
+// ============================================
+// SAVE HISTORY
+// ============================================
+
+function saveScanToHistory(
+    data
+) {
+
+    try {
+
+        const history =
+            JSON.parse(
+                localStorage.getItem(
+                    "shadowScanHistory"
+                ) || "[]"
+            );
+
+
+        const historyItem = {
+
+            id:
+                data.scan_id ||
+                Date.now(),
+
+            target:
+                data.target ||
+                "Unknown",
+
+            start_port:
+                data.start_port ??
+                "",
+
+            end_port:
+                data.end_port ??
+                "",
+
+            total_ports:
+                data.ports_scanned ??
+                0,
+
+            open_ports:
+                data.open_ports_count ??
+                0,
+
+            average_risk_score:
+                data.average_risk_score ??
+                0,
+
+            risk_level:
+                data.overall_risk ||
+                calculateOverallRisk(
+                    data.average_risk_score
+                ),
+
+            timestamp:
+                new Date().toISOString()
+        };
+
+
+        history.unshift(
+            historyItem
+        );
+
+
+        localStorage.setItem(
+            "shadowScanHistory",
+            JSON.stringify(
+                history.slice(
+                    0,
+                    20
+                )
+            )
+        );
+
+
+        loadHistory();
+
+
+    } catch (error) {
+
+        console.error(
+            "HISTORY SAVE ERROR:",
+            error
+        );
+    }
+}
+
+
+// ============================================
+// LOAD HISTORY
+// ============================================
+
+function loadHistory() {
+
+    if (!historyBody) {
+        return;
     }
 
 
-    let title =
-        "";
-
-    let description =
-        "";
-
-    let severity =
-        "info";
-
-    let icon =
-        "🔵";
-
-
-    // ========================================================
-    // SERVICE ANALYSIS
-    // ========================================================
-
-    switch (port) {
-
-
-        case 21:
-
-            title =
-                "FTP service detected";
-
-            description =
-                "FTP is used for file transfer. " +
-                "Traditional FTP does not encrypt traffic by default. " +
-                "Review whether secure alternatives such as SFTP are available.";
-
-            severity =
-                "medium";
-
-            icon =
-                "🟠";
-
-            break;
-
-
-        case 22:
-
-            title =
-                "SSH service detected";
-
-            description =
-                "SSH provides remote administration. " +
-                "Verify strong authentication, disable unnecessary access, " +
-                "and restrict the service to authorized users.";
-
-            severity =
-                "low";
-
-            icon =
-                "🟢";
-
-            break;
-
-
-        case 23:
-
-            title =
-                "Telnet service detected";
-
-            description =
-                "Telnet is a legacy remote-access protocol that does not " +
-                "provide modern encrypted communication. Consider replacing " +
-                "it with SSH.";
-
-            severity =
-                "high";
-
-            icon =
-                "🔴";
-
-            break;
-
-
-        case 25:
-
-            title =
-                "SMTP service detected";
-
-            description =
-                "An email service is reachable on this port. " +
-                "Review mail-server configuration, authentication, " +
-                "and access restrictions.";
-
-            severity =
-                "medium";
-
-            icon =
-                "🟠";
-
-            break;
-
-
-        case 53:
-
-            title =
-                "DNS service detected";
-
-            description =
-                "A DNS service is reachable. Review whether the service " +
-                "is intended to be publicly accessible and properly configured.";
-
-            severity =
-                "low";
-
-            icon =
-                "🟢";
-
-            break;
-
-
-        case 80:
-
-            title =
-                "HTTP web service detected";
-
-            description =
-                "An HTTP web service is reachable. " +
-                "Review the application and consider HTTPS for protected communication.";
-
-            severity =
-                "low";
-
-            icon =
-                "🟢";
-
-            break;
-
-
-        case 110:
-
-            title =
-                "POP3 service detected";
-
-            description =
-                "POP3 is commonly used for email retrieval. " +
-                "Review whether encrypted email access is configured.";
-
-            severity =
-                "medium";
-
-            icon =
-                "🟠";
-
-            break;
-
-
-        case 143:
-
-            title =
-                "IMAP service detected";
-
-            description =
-                "An IMAP email service is reachable. " +
-                "Review authentication and encrypted transport settings.";
-
-            severity =
-                "medium";
-
-            icon =
-                "🟠";
-
-            break;
-
-
-        case 443:
-
-            title =
-                "HTTPS service detected";
-
-            description =
-                "An HTTPS web service is reachable. " +
-                "Verify TLS configuration, certificates, and application security.";
-
-            severity =
-                "info";
-
-            icon =
-                "🔵";
-
-            break;
-
-
-        case 3306:
-
-            title =
-                "MySQL database detected";
-
-            description =
-                "A MySQL database service is reachable. " +
-                "Database services should normally be restricted to authorized systems.";
-
-            severity =
-                "medium";
-
-            icon =
-                "🟠";
-
-            break;
-
-
-        case 5432:
-
-            title =
-                "PostgreSQL database detected";
-
-            description =
-                "A PostgreSQL database service is reachable. " +
-                "Review network restrictions and authentication controls.";
-
-            severity =
-                "medium";
-
-            icon =
-                "🟠";
-
-            break;
-
-
-        case 6379:
-
-            title =
-                "Redis service detected";
-
-            description =
-                "A Redis service is reachable. " +
-                "Review authentication and network-access controls.";
-
-            severity =
-                "medium";
-
-            icon =
-                "🟠";
-
-            break;
-
-
-        case 8000:
-
-            title =
-                "FastAPI / HTTP service detected";
-
-            description =
-                "A web API service is reachable on port 8000. " +
-                "Review API authentication, exposed endpoints, " +
-                "and access controls.";
-
-            severity =
-                "info";
-
-            icon =
-                "🔵";
-
-            break;
-
-
-        case 8080:
-
-            title =
-                "HTTP service detected";
-
-            description =
-                "An HTTP service is reachable on port 8080. " +
-                "Review the application configuration and access controls.";
-
-            severity =
-                "low";
-
-            icon =
-                "🟢";
-
-            break;
-
-
-        default:
-
-            title =
-                `${service} service detected`;
-
-            description =
-                `Port ${port} is open and associated with ${service}. ` +
-                "Review whether this service needs to be accessible.";
-
-            severity =
-                "info";
-
-            icon =
-                "🔵";
+    try {
+
+        const history =
+            JSON.parse(
+                localStorage.getItem(
+                    "shadowScanHistory"
+                ) || "[]"
+            );
+
+
+        if (
+            !Array.isArray(history) ||
+            history.length === 0
+        ) {
+
+            historyBody.innerHTML = `
+                <tr>
+                    <td
+                        colspan="7"
+                    >
+                        No scan history yet.
+                    </td>
+                </tr>
+            `;
+
+            return;
+        }
+
+
+        historyBody.innerHTML =
+            history.map(
+                item => {
+
+                    const date =
+                        new Date(
+                            item.timestamp
+                        );
+
+
+                    const risk =
+                        String(
+                            item.risk_level ||
+                            "LOW"
+                        ).toUpperCase();
+
+
+                    const riskClass =
+                        risk.toLowerCase();
+
+
+                    return `
+                        <tr>
+
+                            <td>
+                                ${escapeHTML(
+                                    item.target ||
+                                    "Unknown"
+                                )}
+                            </td>
+
+                            <td>
+                                ${
+                                    item.start_port
+                                }
+                                -
+                                ${
+                                    item.end_port
+                                }
+                            </td>
+
+                            <td>
+                                ${
+                                    item.total_ports
+                                }
+                            </td>
+
+                            <td>
+                                ${
+                                    item.open_ports
+                                }
+                            </td>
+
+                            <td>
+                                ${
+                                    Number(
+                                        item.average_risk_score ||
+                                        0
+                                    ).toFixed(0)
+                                }
+                            </td>
+
+                            <td>
+                                <span
+                                    class="risk-badge ${riskClass}"
+                                >
+                                    ${risk}
+                                </span>
+                            </td>
+
+                            <td>
+                                ${
+                                    date.toLocaleString()
+                                }
+                            </td>
+
+                        </tr>
+                    `;
+                }
+            ).join("");
+
+
+    } catch (error) {
+
+        console.error(
+            "HISTORY LOAD ERROR:",
+            error
+        );
+    }
+}
+
+
+// ============================================
+// CLEAR HISTORY
+// ============================================
+
+function clearHistory() {
+
+    if (
+        !confirm(
+            "Clear all ShadowScan history?"
+        )
+    ) {
+        return;
     }
 
 
-    // ========================================================
-    // CREATE FINDING
-    // ========================================================
+    localStorage.removeItem(
+        "shadowScanHistory"
+    );
 
-    const finding =
+
+    loadHistory();
+
+
+    addTerminalMessage(
+        "Scan history cleared.",
+        "info"
+    );
+}
+
+
+// ============================================
+// EXPORT REPORT
+// ============================================
+
+function exportReport() {
+
+    if (!lastScanData) {
+
+        alert(
+            "No scan results available to export."
+        );
+
+        return;
+    }
+
+
+    const data =
+        lastScanData;
+
+
+    const lines = [];
+
+
+    // ----------------------------------------
+    // HEADER
+    // ----------------------------------------
+
+    lines.push(
+        "============================================================"
+    );
+
+    lines.push(
+        "                       SHADOWSCAN"
+    );
+
+    lines.push(
+        "                 SECURITY SCAN REPORT"
+    );
+
+    lines.push(
+        "============================================================"
+    );
+
+    lines.push("");
+
+
+    // ----------------------------------------
+    // INFORMATION
+    // ----------------------------------------
+
+    lines.push(
+        "SCAN INFORMATION"
+    );
+
+    lines.push(
+        "------------------------------------------------------------"
+    );
+
+    lines.push(
+        `Target: ${data.target || "Unknown"}`
+    );
+
+    lines.push(
+        `Resolved Target: ${
+            data.resolved_target ||
+            "Unknown"
+        }`
+    );
+
+    lines.push(
+        `Port Range: ${
+            data.start_port
+        } - ${
+            data.end_port
+        }`
+    );
+
+    lines.push(
+        `Ports Scanned: ${
+            data.ports_scanned ||
+            0
+        }`
+    );
+
+    lines.push(
+        `Open Ports: ${
+            data.open_ports_count ||
+            0
+        }`
+    );
+
+    lines.push(
+        `Closed Ports: ${
+            data.closed_ports ||
+            0
+        }`
+    );
+
+    lines.push(
+        `Average Risk Score: ${
+            data.average_risk_score ||
+            0
+        }`
+    );
+
+    lines.push(
+        `Overall Risk: ${
+            data.overall_risk ||
+            "LOW"
+        }`
+    );
+
+    lines.push(
+        `Scan Status: ${
+            data.scan_status ||
+            "completed"
+        }`
+    );
+
+    lines.push("");
+
+
+    // ----------------------------------------
+    // RISK DISTRIBUTION
+    // ----------------------------------------
+
+    const counts =
+        getRiskCounts(data);
+
+
+    lines.push(
+        "RISK DISTRIBUTION"
+    );
+
+    lines.push(
+        "------------------------------------------------------------"
+    );
+
+    lines.push(
+        `LOW: ${counts.LOW}`
+    );
+
+    lines.push(
+        `MEDIUM: ${counts.MEDIUM}`
+    );
+
+    lines.push(
+        `HIGH: ${counts.HIGH}`
+    );
+
+    lines.push(
+        `CRITICAL: ${counts.CRITICAL}`
+    );
+
+    lines.push("");
+
+
+    // ----------------------------------------
+    // OPEN PORTS
+    // ----------------------------------------
+
+    lines.push(
+        "OPEN PORTS"
+    );
+
+    lines.push(
+        "------------------------------------------------------------"
+    );
+
+
+    if (
+        currentResults.length === 0
+    ) {
+
+        lines.push(
+            "No open ports detected."
+        );
+
+    } else {
+
+        currentResults.forEach(
+            result => {
+
+                lines.push(
+                    `Port: ${
+                        result.port ??
+                        "—"
+                    }`
+                );
+
+                lines.push(
+                    `Service: ${
+                        result.service ||
+                        "Unknown"
+                    }`
+                );
+
+                lines.push(
+                    `Risk: ${
+                        result.risk ||
+                        "UNKNOWN"
+                    }`
+                );
+
+                lines.push(
+                    `Risk Score: ${
+                        result.risk_score ??
+                        "—"
+                    }`
+                );
+
+                lines.push(
+                    `Banner: ${
+                        result.banner ||
+                        "—"
+                    }`
+                );
+
+                lines.push(
+                    `Reason: ${
+                        result.risk_reason ||
+                        "—"
+                    }`
+                );
+
+                lines.push(
+                    `Finding: ${
+                        result.finding ||
+                        "—"
+                    }`
+                );
+
+                lines.push(
+                    `Recommendation: ${
+                        result.recommendation ||
+                        "—"
+                    }`
+                );
+
+                lines.push(
+                    "------------------------------------------------------------"
+                );
+            }
+        );
+    }
+
+
+    lines.push("");
+
+
+    // ----------------------------------------
+    // SECURITY FINDINGS
+    // ----------------------------------------
+
+    lines.push(
+        "SECURITY FINDINGS"
+    );
+
+    lines.push(
+        "------------------------------------------------------------"
+    );
+
+
+    const findings =
+        Array.isArray(
+            data.security_findings
+        )
+            ? data.security_findings
+            : [];
+
+
+    if (
+        findings.length === 0
+    ) {
+
+        lines.push(
+            "No security findings detected."
+        );
+
+    } else {
+
+        findings.forEach(
+            (finding, index) => {
+
+                lines.push(
+                    `${index + 1}. ${
+                        finding.title ||
+                        "Security Finding"
+                    }`
+                );
+
+                lines.push(
+                    `Severity: ${
+                        finding.severity ||
+                        "LOW"
+                    }`
+                );
+
+                lines.push(
+                    `Port: ${
+                        finding.port ??
+                        "—"
+                    }`
+                );
+
+                lines.push(
+                    `Service: ${
+                        finding.service ||
+                        "Unknown"
+                    }`
+                );
+
+                lines.push(
+                    `Risk Score: ${
+                        finding.risk_score ??
+                        "—"
+                    }`
+                );
+
+                lines.push(
+                    `Description: ${
+                        finding.description ||
+                        "—"
+                    }`
+                );
+
+                lines.push(
+                    `Recommendation: ${
+                        finding.recommendation ||
+                        "—"
+                    }`
+                );
+
+                lines.push("");
+            }
+        );
+    }
+
+
+    // ----------------------------------------
+    // FOOTER
+    // ----------------------------------------
+
+    lines.push(
+        "============================================================"
+    );
+
+    lines.push(
+        "Generated by ShadowScan"
+    );
+
+    lines.push(
+        "Authorized security testing only."
+    );
+
+    lines.push(
+        "============================================================"
+    );
+
+
+    // ----------------------------------------
+    // DOWNLOAD
+    // ----------------------------------------
+
+    const blob =
+        new Blob(
+            [
+                lines.join("\n")
+            ],
+            {
+                type:
+                    "text/plain;charset=utf-8"
+            }
+        );
+
+
+    const url =
+        URL.createObjectURL(
+            blob
+        );
+
+
+    const link =
+        document.createElement(
+            "a"
+        );
+
+
+    const safeTarget =
+        String(
+            data.target ||
+            "target"
+        )
+            .replace(
+                /[^a-zA-Z0-9.-]/g,
+                "_"
+            );
+
+
+    link.href =
+        url;
+
+
+    link.download =
+        `ShadowScan_Report_${safeTarget}.txt`;
+
+
+    document.body.appendChild(
+        link
+    );
+
+
+    link.click();
+
+
+    document.body.removeChild(
+        link
+    );
+
+
+    URL.revokeObjectURL(
+        url
+    );
+
+
+    addTerminalMessage(
+        "Security report exported successfully.",
+        "success"
+    );
+}
+
+
+// ============================================
+// GET RISK COUNTS
+// ============================================
+
+function getRiskCounts(
+    data
+) {
+
+    const counts = {
+
+        LOW: 0,
+
+        MEDIUM: 0,
+
+        HIGH: 0,
+
+        CRITICAL: 0
+    };
+
+
+    if (
+        data.risk_counts &&
+        typeof data.risk_counts === "object"
+    ) {
+
+        counts.LOW =
+            Number(
+                data.risk_counts.LOW || 0
+            );
+
+        counts.MEDIUM =
+            Number(
+                data.risk_counts.MEDIUM || 0
+            );
+
+        counts.HIGH =
+            Number(
+                data.risk_counts.HIGH || 0
+            );
+
+        counts.CRITICAL =
+            Number(
+                data.risk_counts.CRITICAL || 0
+            );
+    }
+
+
+    return counts;
+}
+
+
+// ============================================
+// TERMINAL MESSAGE
+// ============================================
+
+function addTerminalMessage(
+    message,
+    type = "info"
+) {
+
+    if (!output) {
+        return;
+    }
+
+
+    const line =
         document.createElement(
             "div"
         );
 
 
-    finding.className =
-        `finding finding-${severity}`;
+    line.className =
+        `terminal-line ${type}`;
 
 
-    finding.innerHTML = `
-        <div class="finding-title">
-
-            <span class="finding-icon">
-                ${icon}
-            </span>
-
-            ${title}
-
-        </div>
-
-        <div class="finding-description">
-
-            ${description}
-
-        </div>
-    `;
+    const time =
+        new Date()
+            .toLocaleTimeString();
 
 
-    securityFindings.appendChild(
-        finding
+    line.textContent =
+        `[${time}] ${message}`;
+
+
+    output.appendChild(
+        line
     );
+
+
+    output.scrollTop =
+        output.scrollHeight;
 }
 
 
-// ============================================================
-// SAVE SCAN HISTORY
-// ============================================================
+// ============================================
+// ESCAPE HTML
+// ============================================
 
-function saveScanHistory(
-    scan
+function escapeHTML(
+    value
 ) {
 
-    let history =
-        JSON.parse(
-            localStorage.getItem(
-                "shadowScanHistory"
-            )
-        ) || [];
+    return String(value)
 
+        .replace(
+            /&/g,
+            "&amp;"
+        )
 
-    history.unshift(
-        scan
-    );
+        .replace(
+            /</g,
+            "&lt;"
+        )
 
+        .replace(
+            />/g,
+            "&gt;"
+        )
 
-    // Keep last 10 scans
+        .replace(
+            /"/g,
+            "&quot;"
+        )
 
-    history =
-        history.slice(
-            0,
-            10
+        .replace(
+            /'/g,
+            "&#039;"
         );
-
-
-    localStorage.setItem(
-        "shadowScanHistory",
-        JSON.stringify(history)
-    );
 }
 
 
-// ============================================================
-// DISPLAY HISTORY
-// ============================================================
+// ============================================
+// PRESETS
+// ============================================
 
-function displayHistory() {
-
-    if (!historyBody) {
-
-        return;
-    }
-
-
-    let history =
-        JSON.parse(
-            localStorage.getItem(
-                "shadowScanHistory"
-            )
-        ) || [];
-
-
-    historyBody.innerHTML =
-        "";
-
-
-    if (
-        history.length === 0
-    ) {
-
-        const row =
-            document.createElement(
-                "tr"
-            );
-
-
-        row.innerHTML = `
-            <td colspan="5">
-                No scan history yet.
-            </td>
-        `;
-
-
-        historyBody.appendChild(
-            row
-        );
-
-
-        return;
-    }
-
-
-    history.forEach(
-        scan => {
-
-            const row =
-                document.createElement(
-                    "tr"
-                );
-
-
-            row.innerHTML = `
-                <td>
-                    ${scan.time}
-                </td>
-
-                <td>
-                    ${scan.target}
-                </td>
-
-                <td>
-                    ${scan.range}
-                </td>
-
-                <td>
-                    ${scan.open}
-                </td>
-
-                <td>
-                    <span class="${getHistoryRiskClass(scan.risk)}">
-                        ${scan.risk}
-                    </span>
-                </td>
-            `;
-
-
-            historyBody.appendChild(
-                row
-            );
-        }
-    );
-}
-
-
-// ============================================================
-// HISTORY RISK CLASS
-// ============================================================
-
-function getHistoryRiskClass(
-    risk
+function setPreset(
+    start,
+    end
 ) {
 
-    if (
-        risk === "HIGH"
-    ) {
+    if (startPortInput) {
 
-        return "history-risk-high";
+        startPortInput.value =
+            start;
     }
 
 
-    if (
-        risk === "MEDIUM"
-    ) {
+    if (endPortInput) {
 
-        return "history-risk-medium";
+        endPortInput.value =
+            end;
     }
-
-
-    if (
-        risk === "LOW"
-    ) {
-
-        return "history-risk-low";
-    }
-
-
-    return "";
 }
 
 
-// ============================================================
-// CLEAR HISTORY
-// ============================================================
+// ============================================
+// GLOBAL FUNCTIONS
+// ============================================
 
-if (clearHistoryButton) {
+window.startScan =
+    startScan;
 
-    clearHistoryButton.addEventListener(
-        "click",
-        () => {
+window.stopScan =
+    stopScan;
 
-            localStorage.removeItem(
-                "shadowScanHistory"
-            );
+window.clearHistory =
+    clearHistory;
 
-            displayHistory();
-        }
-    );
-}
+window.exportReport =
+    exportReport;
 
-
-// ============================================================
-// PRESET BUTTONS
-// ============================================================
-
-const presetButtons =
-    document.querySelectorAll(
-        ".preset-btn"
-    );
-
-
-presetButtons.forEach(
-    button => {
-
-        button.addEventListener(
-            "click",
-            () => {
-
-                const start =
-                    button.dataset.start;
-
-                const end =
-                    button.dataset.end;
-
-
-                startPortInput.value =
-                    start;
-
-                endPortInput.value =
-                    end;
-
-
-                output.innerHTML += `
-                    <br>
-                    > PRESET SELECTED: ${start}-${end}_
-                `;
-            }
-        );
-    }
-);
-
-
-// ============================================================
-// INITIALIZE HISTORY
-// ============================================================
-
-displayHistory();
-
-
-// ============================================================
-// STARTUP TERMINAL MESSAGE
-// ============================================================
-
-if (output) {
-
-    output.innerHTML = `
-        > SHADOWSCAN SECURITY ENGINE INITIALIZED_<br>
-        > SYSTEM STATUS: ONLINE_<br>
-        > TCP SCANNER: READY_<br>
-        > RISK ANALYSIS ENGINE: READY_<br>
-        > WAITING FOR SCAN COMMAND...
-    `;
-}
+window.setPreset =
+    setPreset;
