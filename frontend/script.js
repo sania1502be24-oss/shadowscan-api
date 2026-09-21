@@ -3,7 +3,7 @@
 // Version 4.2 - Backend Matched
 // ============================================
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = "https://shadowscan-backend-2vwh.onrender.com";
 
 // Largest range one scan may cover (matches the FULL SCAN preset).
 const MAX_PORT_RANGE = 65535;
