@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>ShadowScan</title>
+
+    <link rel="stylesheet"
+          href="style.css">
+
+</head>
+
+
+<body>
+
+    <!-- ============================= -->
+    <!-- HEADER -->
+    <!-- ============================= -->
+
+    <header>
+
+        <div class="logo">
+            SHADOWSCAN
+        </div>
+
+        <div class="status">
+            ● SYSTEM ONLINE
+        </div>
+
+    </header>
+
+
+    <!-- ============================= -->
+    <!-- MAIN CONTAINER -->
+    <!-- ============================= -->
+
+    <main>
+
+        <section class="scanner-container">
+
+            <h1>
+                NETWORK / PORT SCANNER
+            </h1>
+
+            <p class="subtitle">
+                TCP PORT ENUMERATION ENGINE
+            </p>
+
+
+            <!-- ============================= -->
+            <!-- TARGET INPUT -->
+            <!-- ============================= -->
+
+            <div class="input-group">
+
+                <label for="target">
+                    TARGET HOST
+                </label>
+
+                <input
+                    type="text"
+                    id="target"
+                    placeholder="127.0.0.1"
+                    value="127.0.0.1"
+                >
+
+            </div>
+
+
+            <!-- ============================= -->
+            <!-- PORT INPUTS -->
+            <!-- ============================= -->
+
+            <div class="port-inputs">
+
+                <div class="input-group">
+
+                    <label for="startPort">
+                        START PORT
+                    </label>
+
+                    <input
+                        type="number"
+                        id="startPort"
+                        value="1"
+                        min="1"
+                        max="65535"
+                    >
+
+                </div>
+
+
+                <div class="input-group">
+
+                    <label for="endPort">
+                        END PORT
+                    </label>
+
+                    <input
+                        type="number"
+                        id="endPort"
+                        value="100"
+                        min="1"
+                        max="65535"
+                    >
+
+                </div>
+
+            </div>
+
+
+            <!-- ============================= -->
+            <!-- SCAN BUTTON -->
+            <!-- ============================= -->
+
+            <button id="scanButton">
+
+                ⚡ INITIATE SCAN
+
+            </button>
+
+
+            <!-- ============================= -->
+            <!-- SCAN PRESETS -->
+            <!-- ============================= -->
+
+            <div class="preset-container">
+
+                <button
+                    class="preset-btn"
+                    data-start="1"
+                    data-end="1024"
+                >
+                    COMMON PORTS
+                </button>
+
+                <button
+                    class="preset-btn"
+                    data-start="80"
+                    data-end="443"
+                >
+                    WEB PORTS
+                </button>
+
+                <button
+                    class="preset-btn"
+                    data-start="1"
+                    data-end="65535"
+                >
+                    FULL SCAN
+                </button>
+
+            </div>
+
+
+            <!-- ============================= -->
+            <!-- PROGRESS -->
+            <!-- ============================= -->
+
+            <div class="progress-container">
+
+                <div class="progress-bar">
+
+                    <div id="progressFill"></div>
+
+                </div>
+
+
+                <div id="progressText">
+
+                    0% — READY
+
+                </div>
+
+            </div>
+
+
+            <!-- ============================= -->
+            <!-- STATISTICS -->
+            <!-- ============================= -->
+
+            <div class="stats-container">
+
+
+                <div class="stat-card">
+
+                    <div class="stat-title">
+                        PORTS SCANNED
+                    </div>
+
+                    <div
+                        class="stat-value"
+                        id="portsScanned"
+                    >
+                        0
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <div class="stat-title">
+                        OPEN PORTS
+                    </div>
+
+                    <div
+                        class="stat-value"
+                        id="openPorts"
+                    >
+                        0
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <div class="stat-title">
+                        RISK LEVEL
+                    </div>
+
+                    <div
+                        class="stat-value"
+                        id="riskLevel"
+                    >
+                        —
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- ============================= -->
+            <!-- SCAN HISTORY -->
+            <!-- ============================= -->
+
+            <div class="history-container">
+
+
+                <div class="history-header">
+
+                    <h3>
+                        SCAN HISTORY
+                    </h3>
+
+
+                    <button id="clearHistory">
+
+                        CLEAR HISTORY
+
+                    </button>
+
+                </div>
+
+
+                <table id="historyTable">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>
+                                TIME
+                            </th>
+
+                            <th>
+                                TARGET
+                            </th>
+
+                            <th>
+                                PORT RANGE
+                            </th>
+
+                            <th>
+                                OPEN
+                            </th>
+
+                            <th>
+                                RISK
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody id="historyBody">
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+
+            <!-- ============================= -->
+            <!-- RESULTS TABLE -->
+            <!-- ============================= -->
+
+            <div class="results-container">
+
+                <h3>
+                    SCAN RESULTS
+                </h3>
+
+
+                <table id="resultsTable">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>
+                                PORT
+                            </th>
+
+                            <th>
+                                STATUS
+                            </th>
+
+                            <th>
+                                SERVICE
+                            </th>
+
+                            <th>
+                                RISK
+                            </th>
+
+                            <th>
+                                BANNER
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody id="resultsBody">
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+
+            <!-- ============================= -->
+            <!-- SECURITY FINDINGS -->
+            <!-- ============================= -->
+
+            <section class="findings-section">
+
+                <div class="section-title">
+
+                    <span>⚠</span>
+
+                    SECURITY FINDINGS
+
+                </div>
+
+
+                <div
+                    id="securityFindings"
+                    class="security-findings"
+                >
+
+                    <div class="finding-empty">
+
+                        No security findings yet.
+                        Run a scan to analyze the target.
+
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <!-- ============================= -->
+            <!-- TERMINAL -->
+            <!-- ============================= -->
+
+            <div class="terminal-container">
+
+                <div class="terminal-header">
+
+                    SHADOWSCAN TERMINAL
+
+                </div>
+
+
+                <div
+                    id="output"
+                    class="terminal-output"
+                >
+
+                    > SYSTEM READY_<br>
+                    > WAITING FOR SCAN COMMAND...
+
+                </div>
+
+            </div>
+
+
+        </section>
+
+    </main>
+
+
+    <!-- ============================= -->
+    <!-- FOOTER -->
+    <!-- ============================= -->
+
+    <footer>
+
+        SHADOWSCAN • TCP SECURITY SCANNER
+
+    </footer>
+
+
+    <!-- ============================= -->
+    <!-- JAVASCRIPT -->
+    <!-- ============================= -->
+
+    <script src="script.js"></script>
+
+</body>
+
+</html>
